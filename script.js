@@ -56,6 +56,15 @@ window.resetPocket = function(name) {
   }
 }
 
+window.hapusRiwayatPocket = function(name) {
+  if (confirm(`Hapus semua riwayat untuk "${name}"? Saldo tetap disimpan.`)) {
+    window.state.riwayat = window.state.riwayat.filter(r => r.pocket !== name);
+    saveState();
+    renderPockets();
+  }
+}
+
+
 window.transferAntarPocket = function() {
   const from = document.getElementById('transferFrom').value;
   const to = document.getElementById('transferTo').value;
@@ -187,6 +196,14 @@ window.resetSemuaData = function() {
       }
     });
 
+    saveState();
+    renderPockets();
+  }
+}
+
+window.hapusSemuaRiwayat = function() {
+  if (confirm("Yakin ingin menghapus semua riwayat transaksi? Saldo akan tetap disimpan.")) {
+    window.state.riwayat = [];
     saveState();
     renderPockets();
   }
