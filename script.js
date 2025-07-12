@@ -60,6 +60,7 @@ window.transferAntarPocket = function() {
   const from = document.getElementById('transferFrom').value;
   const to = document.getElementById('transferTo').value;
   const amount = parseFloat(document.getElementById('transferAmount').value);
+  const desc = document.getElementById('transferDesc').value.trim();
 
   if (!from || !to || from === to) {
     alert("Pilih pocket asal dan tujuan yang berbeda.");
@@ -78,11 +79,24 @@ window.transferAntarPocket = function() {
   window.state.saldo[to] += amount;
 
   const now = new Date().toISOString();
-  window.state.riwayat.push({ pocket: from, jumlah: -amount, waktu: now });
-  window.state.riwayat.push({ pocket: to, jumlah: amount, waktu: now });
+  window.state.riwayat.push({
+    pocket: from,
+    jumlah: -amount,
+    waktu: now,
+    deskripsi: desc ? `Transfer ke ${to}${desc ? ': ' + desc : ''}` : `Transfer ke ${to}`
+  });
+  window.state.riwayat.push({
+    pocket: to,
+    jumlah: amount,
+    waktu: now,
+    deskripsi: desc ? `Transfer dari ${from}${desc ? ': ' + desc : ''}` : `Transfer dari ${from}`
+  });
 
   saveState();
   renderPockets();
+  document.getElementById('transferAmount').value = '';
+  document.getElementById('transferDesc').value = '';
+
   document.getElementById('transferAmount').value = '';
 }
 
