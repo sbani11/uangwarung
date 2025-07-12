@@ -157,6 +157,7 @@ window.renderPockets = function() {
       <input type="text" id="desc-${name}" placeholder="Deskripsi (opsional)">
       <button onclick="updatePocket('${name}')">Tambah</button>
       <button onclick="resetPocket('${name}')" style="background: orange; color: white;">Reset Saldo Pocket</button>
+      <button onclick="hapusRiwayatPocket('${name}')" style="background: crimson; color: white;">Hapus Riwayat</button>
       <div class="riwayat">${riwayatHTML}</div>
     `;
     container.appendChild(div);
