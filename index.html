@@ -9,7 +9,7 @@
   <h1>Pencatatan Uang Warung</h1>
   <h2>Transfer Antar Pocket</h2>
 
-  <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px;">
+  <div class="transfer-box">
     <select id="transferFrom">
       <option disabled selected>Dari Pocket</option>
     </select>
@@ -19,6 +19,7 @@
     <input type="number" id="transferAmount" placeholder="Jumlah">
     <button onclick="transferAntarPocket()">Transfer</button>
   </div>
+
 
   <label for="filterDate">Filter Tanggal (Opsional):</label>
   <input type="date" id="filterDate" onchange="renderPockets()">
