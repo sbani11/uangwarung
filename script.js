@@ -24,18 +24,23 @@ window.saveState = function() {
 
 window.updatePocket = function(name) {
   const input = document.getElementById(`input-${name}`);
+  const descInput = document.getElementById(`desc-${name}`);
   const value = parseFloat(input.value);
+  const deskripsi = descInput?.value?.trim();
+
   if (!isNaN(value)) {
     window.state.saldo[name] += value;
     window.state.riwayat.push({
       pocket: name,
       jumlah: value,
-      waktu: new Date().toISOString()
+      waktu: new Date().toISOString(),
+      deskripsi: deskripsi || null
     });
     saveState();
     renderPockets();
   }
 }
+
 
 window.resetPocket = function(name) {
   if (confirm(`Reset saldo "${name}" ke Rp 0? Riwayat akan tetap disimpan.`)) {
@@ -116,14 +121,17 @@ window.renderPockets = function() {
     const riwayatHTML = riwayat.length === 0
       ? '<div class="riwayat-entry">Tidak ada transaksi.</div>'
       : riwayat.map(r => `
-          <div class="riwayat-entry">
-            ${new Date(r.waktu).toLocaleString()} : Rp ${r.jumlah.toLocaleString()}
-          </div>`).join('');
+        <div class="riwayat-entry">
+        ${new Date(r.waktu).toLocaleString()} : Rp ${r.jumlah.toLocaleString()}
+        ${r.deskripsi ? ` - ${r.deskripsi}` : ''}
+      </div>`).join('');
+
 
     div.innerHTML = `
       <h3>${name}</h3>
       <p><strong>Rp ${saldo.toLocaleString()}</strong></p>
       <input type="number" id="${inputId}" placeholder="Masukkan nilai...">
+      <input type="text" id="desc-${name}" placeholder="Deskripsi (opsional)">
       <button onclick="updatePocket('${name}')">Tambah</button>
       <button onclick="resetPocket('${name}')" style="background: orange; color: white;">Reset Saldo Pocket</button>
       <div class="riwayat">${riwayatHTML}</div>
