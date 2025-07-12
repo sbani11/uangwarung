@@ -154,22 +154,21 @@ window.renderPockets = function() {
   });
 }
 
-window.downloadCSV = function() {
-  let csv = 'Tanggal,Pocket,Nilai\n';
-  window.state.riwayat.forEach(r => {
-    csv += `"${r.waktu}","${r.pocket}",${r.jumlah}\n`;
-  });
+window.downloadExcel = function() {
+  const data = window.state.riwayat.map(r => ({
+    Tanggal: new Date(r.waktu).toLocaleString(),
+    Pocket: r.pocket,
+    Nilai: r.jumlah,
+    Deskripsi: r.deskripsi || ''
+  }));
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", "riwayat_uang_warung.csv");
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat");
+
+  XLSX.writeFile(workbook, "riwayat_uang_warung.xlsx");
 }
+
 
 window.resetSemuaData = function() {
   if (confirm("Yakin ingin menghapus SEMUA data dan riwayat?")) {
