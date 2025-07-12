@@ -171,11 +171,27 @@ window.downloadExcel = function() {
 
 
 window.resetSemuaData = function() {
-  if (confirm("Yakin ingin menghapus SEMUA data dan riwayat?")) {
-    localStorage.removeItem('warungState');
-    location.reload();
+  if (confirm("Yakin ingin menghapus SEMUA saldo? Riwayat akan tetap disimpan.")) {
+    const now = new Date().toISOString();
+
+    pockets.forEach(name => {
+      const saldoSebelum = window.state.saldo[name];
+      if (saldoSebelum !== 0) {
+        window.state.riwayat.push({
+          pocket: name,
+          jumlah: -saldoSebelum,
+          waktu: now,
+          deskripsi: 'Reset semua data'
+        });
+        window.state.saldo[name] = 0;
+      }
+    });
+
+    saveState();
+    renderPockets();
   }
 }
+
 
 // Load awal dari Firebase (atau localStorage fallback)
 loadFromFirebase();
