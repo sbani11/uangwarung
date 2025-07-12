@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Uang Warung</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Pencatatan Uang Warung</h1>
+  <h2>Transfer Antar Pocket</h2>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px;">
+    <select id="transferFrom">
+      <option disabled selected>Dari Pocket</option>
+    </select>
+    <select id="transferTo">
+      <option disabled selected>Ke Pocket</option>
+    </select>
+    <input type="number" id="transferAmount" placeholder="Jumlah">
+    <button onclick="transferAntarPocket()">Transfer</button>
+  </div>
+
+  <label for="filterDate">Filter Tanggal (Opsional):</label>
+  <input type="date" id="filterDate" onchange="renderPockets()">
+
+  <div class="container" id="pocketContainer"></div>
+
+  <div class="actions">
+    <button onclick="downloadCSV()">Download Excel (CSV)</button>
+    <button class="reset-btn" onclick="resetSemuaData()">Reset Semua Data</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
