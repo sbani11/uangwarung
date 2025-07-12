@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Uang Warung</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <h1>Pencatatan Uang Warung</h1>
@@ -28,7 +29,7 @@
   <div class="container" id="pocketContainer"></div>
 
   <div class="actions">
-    <button onclick="downloadCSV()">Download Excel (CSV)</button>
+    <button onclick="downloadExcel()">Download Excel (.xlsx)</button>
     <button class="reset-btn" onclick="resetSemuaData()">Reset Semua Data</button>
   </div>
 
