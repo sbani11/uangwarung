@@ -1,4 +1,6 @@
-const pockets = [
+import { loadFromFirebase, saveToFirebase } from './firebase.js';
+
+export const pockets = [
   "Dagangan Sembako",
   "Uang BCA",
   "Uang BRI",
@@ -7,24 +9,25 @@ const pockets = [
   "Pulsa/Paket"
 ];
 
-let state = JSON.parse(localStorage.getItem('warungState')) || {
+window.state = JSON.parse(localStorage.getItem('warungState')) || {
   saldo: {}, riwayat: []
 };
 
 pockets.forEach(name => {
-  if (state.saldo[name] === undefined) state.saldo[name] = 0;
+  if (window.state.saldo[name] === undefined) window.state.saldo[name] = 0;
 });
 
-function saveState() {
-  localStorage.setItem('warungState', JSON.stringify(state));
+window.saveState = function() {
+  localStorage.setItem('warungState', JSON.stringify(window.state));
+  saveToFirebase(window.state);
 }
 
-function updatePocket(name) {
+window.updatePocket = function(name) {
   const input = document.getElementById(`input-${name}`);
   const value = parseFloat(input.value);
   if (!isNaN(value)) {
-    state.saldo[name] += value;
-    state.riwayat.push({
+    window.state.saldo[name] += value;
+    window.state.riwayat.push({
       pocket: name,
       jumlah: value,
       waktu: new Date().toISOString()
@@ -34,11 +37,11 @@ function updatePocket(name) {
   }
 }
 
-function resetPocket(name) {
+window.resetPocket = function(name) {
   if (confirm(`Reset saldo "${name}" ke Rp 0? Riwayat akan tetap disimpan.`)) {
-    const selisih = -state.saldo[name];
-    state.saldo[name] = 0;
-    state.riwayat.push({
+    const selisih = -window.state.saldo[name];
+    window.state.saldo[name] = 0;
+    window.state.riwayat.push({
       pocket: name,
       jumlah: selisih,
       waktu: new Date().toISOString()
@@ -48,7 +51,7 @@ function resetPocket(name) {
   }
 }
 
-function transferAntarPocket() {
+window.transferAntarPocket = function() {
   const from = document.getElementById('transferFrom').value;
   const to = document.getElementById('transferTo').value;
   const amount = parseFloat(document.getElementById('transferAmount').value);
@@ -61,24 +64,24 @@ function transferAntarPocket() {
     alert("Masukkan jumlah yang valid.");
     return;
   }
-  if (state.saldo[from] < amount) {
+  if (window.state.saldo[from] < amount) {
     alert("Saldo tidak cukup di pocket asal.");
     return;
   }
 
-  state.saldo[from] -= amount;
-  state.saldo[to] += amount;
+  window.state.saldo[from] -= amount;
+  window.state.saldo[to] += amount;
 
   const now = new Date().toISOString();
-  state.riwayat.push({ pocket: from, jumlah: -amount, waktu: now });
-  state.riwayat.push({ pocket: to, jumlah: amount, waktu: now });
+  window.state.riwayat.push({ pocket: from, jumlah: -amount, waktu: now });
+  window.state.riwayat.push({ pocket: to, jumlah: amount, waktu: now });
 
   saveState();
   renderPockets();
   document.getElementById('transferAmount').value = '';
 }
 
-function renderPockets() {
+window.renderPockets = function() {
   const container = document.getElementById('pocketContainer');
   const filter = document.getElementById('filterDate').value;
   container.innerHTML = '';
@@ -99,10 +102,10 @@ function renderPockets() {
   pockets.forEach(name => {
     const div = document.createElement('div');
     div.className = 'pocket';
-    const saldo = state.saldo[name];
+    const saldo = window.state.saldo[name];
     const inputId = `input-${name}`;
 
-    const riwayat = state.riwayat
+    const riwayat = window.state.riwayat
       .filter(r => r.pocket === name)
       .filter(r => {
         if (!filter) return true;
@@ -129,9 +132,9 @@ function renderPockets() {
   });
 }
 
-function downloadCSV() {
+window.downloadCSV = function() {
   let csv = 'Tanggal,Pocket,Nilai\n';
-  state.riwayat.forEach(r => {
+  window.state.riwayat.forEach(r => {
     csv += `"${r.waktu}","${r.pocket}",${r.jumlah}\n`;
   });
 
@@ -146,11 +149,12 @@ function downloadCSV() {
   document.body.removeChild(link);
 }
 
-function resetSemuaData() {
+window.resetSemuaData = function() {
   if (confirm("Yakin ingin menghapus SEMUA data dan riwayat?")) {
     localStorage.removeItem('warungState');
     location.reload();
   }
 }
 
-renderPockets();
+// Load awal dari Firebase (atau localStorage fallback)
+loadFromFirebase();
