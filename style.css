@@ -27,6 +27,9 @@ input[type="date"] {
 button {
   padding: 5px 10px;
   margin-top: 5px;
+  cursor: pointer;
+  border-radius: 6px;
+  border: none;
 }
 .riwayat {
   margin-top: 15px;
@@ -82,4 +85,28 @@ button {
 
 .transfer-box button:hover {
   background: #45a049;
+}
+
+/* ===== Tambahan untuk Saldo Rekening & Laci ===== */
+.saldo-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.saldo-item {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 15px;
+  color: white;
+}
+
+.saldo-rekening {
+  background: #2196f3; /* biru */
+}
+
+.saldo-laci {
+  background: #4caf50; /* hijau */
 }
