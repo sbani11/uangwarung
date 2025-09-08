@@ -1,5 +1,46 @@
-import { loadFromFirebase, saveToFirebase } from './firebase.js';
+// ====== Firebase Setup ======
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
+// Konfigurasi Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyCMjhDLBxADuVKAXu63GaTCo-whHtgZ2s4",
+  authDomain: "pocketwarungbuyusuf.firebaseapp.com",
+  projectId: "pocketwarungbuyusuf",
+  storageBucket: "pocketwarungbuyusuf.appspot.com",
+  messagingSenderId: "43296073935",
+  appId: "1:43296073935:web:7d36db866697d59c1f2fba",
+  measurementId: "G-MPD31CMZPW"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const docRef = doc(db, "warung", "user-pribadi");
+
+async function loadFromFirebase() {
+  try {
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      localStorage.setItem('warungState', JSON.stringify(data));
+      window.state = data;
+      window.renderPockets();
+    } else {
+      window.renderPockets(); // fallback
+    }
+  } catch (e) {
+    console.error("Gagal ambil dari Firebase:", e);
+    window.renderPockets(); // fallback local
+  }
+}
+
+function saveToFirebase(state) {
+  setDoc(docRef, state).catch(err => {
+    console.error("Gagal simpan ke Firebase:", err);
+  });
+}
+
+// ====== Aplikasi Warung ======
 export const pockets = [
   "Dagangan Sembako",
   "Uang BCA",
@@ -41,7 +82,6 @@ window.updatePocket = function(name) {
   }
 }
 
-
 window.resetPocket = function(name) {
   if (confirm(`Reset saldo "${name}" ke Rp 0? Riwayat akan tetap disimpan.`)) {
     const selisih = -window.state.saldo[name];
@@ -63,7 +103,6 @@ window.hapusRiwayatPocket = function(name) {
     renderPockets();
   }
 }
-
 
 window.transferAntarPocket = function() {
   const from = document.getElementById('transferFrom').value;
@@ -105,8 +144,6 @@ window.transferAntarPocket = function() {
   renderPockets();
   document.getElementById('transferAmount').value = '';
   document.getElementById('transferDesc').value = '';
-
-  document.getElementById('transferAmount').value = '';
 }
 
 window.renderPockets = function() {
@@ -149,7 +186,6 @@ window.renderPockets = function() {
         ${r.deskripsi ? ` - ${r.deskripsi}` : ''}
       </div>`).join('');
 
-
     div.innerHTML = `
       <h3>${name}</h3>
       <p><strong>Rp ${saldo.toLocaleString()}</strong></p>
@@ -178,7 +214,6 @@ window.downloadExcel = function() {
 
   XLSX.writeFile(workbook, "riwayat_uang_warung.xlsx");
 }
-
 
 window.resetSemuaData = function() {
   if (confirm("Yakin ingin menghapus SEMUA saldo? Riwayat akan tetap disimpan.")) {
@@ -209,7 +244,6 @@ window.hapusSemuaRiwayat = function() {
     renderPockets();
   }
 }
-
 
 // Load awal dari Firebase (atau localStorage fallback)
 loadFromFirebase();
