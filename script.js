@@ -1,6 +1,8 @@
 // ====== Firebase Setup ======
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { 
+  getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs 
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
 // Konfigurasi Firebase
 const firebaseConfig = {
@@ -15,30 +17,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const docRef = doc(db, "warung", "user-pribadi");
 
-async function loadFromFirebase() {
-  try {
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      localStorage.setItem('warungState', JSON.stringify(data));
-      window.state = data;
-      window.renderPockets();
-    } else {
-      window.renderPockets(); // fallback
-    }
-  } catch (e) {
-    console.error("Gagal ambil dari Firebase:", e);
-    window.renderPockets(); // fallback local
-  }
-}
-
-function saveToFirebase(state) {
-  setDoc(docRef, state).catch(err => {
-    console.error("Gagal simpan ke Firebase:", err);
-  });
-}
+const saldoRef = doc(db, "warung/user-pribadi/saldo/data");
+const riwayatCol = collection(db, "warung/user-pribadi/riwayat");
 
 // ====== Aplikasi Warung ======
 export const pockets = [
@@ -50,71 +31,145 @@ export const pockets = [
   "Pulsa/Paket"
 ];
 
-window.state = JSON.parse(localStorage.getItem('warungState')) || {
-  saldo: {}, riwayat: []
+// State lokal
+window.state = {
+  saldo: {},
+  riwayat: []
 };
 
+// Inisialisasi saldo default
 pockets.forEach(name => {
-  if (!window.state.saldo[name]) {
-    window.state.saldo[name] = { rekening: 0, laci: 0 };
-  } else {
-    // migrasi data lama (jika hanya angka)
-    if (typeof window.state.saldo[name] === "number") {
-      window.state.saldo[name] = { rekening: window.state.saldo[name], laci: 0 };
-    }
-  }
+  window.state.saldo[name] = { rekening: 0, laci: 0 };
 });
 
-window.saveState = function() {
-  localStorage.setItem('warungState', JSON.stringify(window.state));
-  saveToFirebase(window.state);
+// ====== Load Data dari Firestore ======
+async function loadFromFirebase() {
+  try {
+    // Ambil saldo
+    const snapSaldo = await getDoc(saldoRef);
+    if (snapSaldo.exists()) {
+      window.state.saldo = snapSaldo.data();
+    }
+
+    // Ambil riwayat
+    const snapRiwayat = await getDocs(riwayatCol);
+    window.state.riwayat = [];
+    snapRiwayat.forEach(doc => {
+      window.state.riwayat.push(doc.data());
+    });
+
+    localStorage.setItem('warungState', JSON.stringify(window.state));
+    window.renderPockets();
+  } catch (e) {
+    console.error("Gagal load Firebase:", e);
+    // fallback dari localStorage
+    const saved = JSON.parse(localStorage.getItem('warungState'));
+    if (saved) window.state = saved;
+    window.renderPockets();
+  }
 }
 
-// ====== Transfer & Tarik Tunai ======
-window.transferRekeningKeLaci = function(name) {
+// ====== Save ke Firestore ======
+async function saveSaldo() {
+  await setDoc(saldoRef, window.state.saldo);
+}
+
+async function addRiwayat(entry) {
+  await addDoc(riwayatCol, entry);
+}
+
+// ====== Fungsi Tambah ======
+window.tambahKeRekening = async function(name) {
   const input = document.getElementById(`input-${name}`);
   const value = parseFloat(input.value);
   if (isNaN(value) || value <= 0) return alert("Jumlah tidak valid");
 
-  if (window.state.saldo[name].rekening < value) {
-    return alert("Saldo rekening tidak cukup");
-  }
-
-  window.state.saldo[name].rekening -= value;
-  window.state.saldo[name].laci += value;
-
-  window.state.riwayat.push({
+  window.state.saldo[name].rekening += value;
+  const entry = {
     pocket: name,
     jumlah: value,
     waktu: new Date().toISOString(),
-    deskripsi: `Transfer Rekening → Laci`
-  });
+    deskripsi: "Tambah ke Rekening"
+  };
+  window.state.riwayat.push(entry);
 
-  saveState();
+  await saveSaldo();
+  await addRiwayat(entry);
+
+  localStorage.setItem('warungState', JSON.stringify(window.state));
   renderPockets();
   input.value = '';
 }
 
-window.tarikTunai = function(name) {
+window.tambahKeLaci = async function(name) {
   const input = document.getElementById(`input-${name}`);
   const value = parseFloat(input.value);
   if (isNaN(value) || value <= 0) return alert("Jumlah tidak valid");
 
-  if (window.state.saldo[name].laci < value) {
-    return alert("Saldo laci tidak cukup");
-  }
+  window.state.saldo[name].laci += value;
+  const entry = {
+    pocket: name,
+    jumlah: value,
+    waktu: new Date().toISOString(),
+    deskripsi: "Tambah ke Laci"
+  };
+  window.state.riwayat.push(entry);
+
+  await saveSaldo();
+  await addRiwayat(entry);
+
+  localStorage.setItem('warungState', JSON.stringify(window.state));
+  renderPockets();
+  input.value = '';
+}
+
+// ====== Transfer & Tarik Tunai ======
+window.transferRekeningKeLaci = async function(name) {
+  const input = document.getElementById(`input-${name}`);
+  const value = parseFloat(input.value);
+  if (isNaN(value) || value <= 0) return alert("Jumlah tidak valid");
+  if (window.state.saldo[name].rekening < value) return alert("Saldo rekening tidak cukup");
+
+  window.state.saldo[name].rekening -= value;
+  window.state.saldo[name].laci += value;
+
+  const entry = {
+    pocket: name,
+    jumlah: value,
+    waktu: new Date().toISOString(),
+    deskripsi: "Transfer Rekening → Laci"
+  };
+  window.state.riwayat.push(entry);
+
+  await saveSaldo();
+  await addRiwayat(entry);
+
+  localStorage.setItem('warungState', JSON.stringify(window.state));
+  renderPockets();
+  input.value = '';
+}
+
+window.tarikTunai = async function(name) {
+  const input = document.getElementById(`input-${name}`);
+  const value = parseFloat(input.value);
+  if (isNaN(value) || value <= 0) return alert("Jumlah tidak valid");
+  if (window.state.saldo[name].laci < value) return alert("Saldo laci tidak cukup");
 
   window.state.saldo[name].laci -= value;
   window.state.saldo[name].rekening += value;
 
-  window.state.riwayat.push({
+  const entry = {
     pocket: name,
     jumlah: value,
     waktu: new Date().toISOString(),
-    deskripsi: `Tarik Tunai Laci → Rekening`
-  });
+    deskripsi: "Tarik Tunai Laci → Rekening"
+  };
+  window.state.riwayat.push(entry);
 
-  saveState();
+  await saveSaldo();
+  await addRiwayat(entry);
+
+  localStorage.setItem('warungState', JSON.stringify(window.state));
   renderPockets();
   input.value = '';
 }
@@ -129,9 +184,7 @@ window.renderPockets = function() {
     const div = document.createElement('div');
     div.className = 'pocket';
 
-    const saldo = window.state.saldo[name];
-    if (!saldo.rekening) saldo.rekening = 0;
-    if (!saldo.laci) saldo.laci = 0;
+    const saldo = window.state.saldo[name] || { rekening: 0, laci: 0 };
 
     const riwayat = window.state.riwayat
       .filter(r => r.pocket === name)
@@ -148,9 +201,13 @@ window.renderPockets = function() {
 
     div.innerHTML = `
       <h3>${name}</h3>
-      <p><strong>Saldo Rekening: Rp ${saldo.rekening.toLocaleString()}</strong></p>
-      <p><strong>Saldo Laci: Rp ${saldo.laci.toLocaleString()}</strong></p>
+      <div class="saldo-box">
+        <div class="saldo-item saldo-rekening">Saldo Rekening: Rp ${saldo.rekening.toLocaleString()}</div>
+        <div class="saldo-item saldo-laci">Saldo Laci: Rp ${saldo.laci.toLocaleString()}</div>
+      </div>
       <input type="number" id="input-${name}" placeholder="Masukkan jumlah...">
+      <button onclick="tambahKeRekening('${name}')">+ Rekening</button>
+      <button onclick="tambahKeLaci('${name}')" style="background:#2e7d32; color:white;">+ Laci</button>
       <button onclick="transferRekeningKeLaci('${name}')">Transfer</button>
       <button onclick="tarikTunai('${name}')" style="background: orange; color:white;">Tarik Tunai</button>
       <div class="riwayat">${riwayatHTML}</div>
@@ -176,36 +233,43 @@ window.downloadExcel = function() {
 }
 
 // ====== Reset Semua Data ======
-window.resetSemuaData = function() {
+window.resetSemuaData = async function() {
   if (confirm("Yakin ingin menghapus SEMUA saldo? Riwayat akan tetap disimpan.")) {
     const now = new Date().toISOString();
 
     pockets.forEach(name => {
       const saldo = window.state.saldo[name];
       if (saldo.rekening !== 0 || saldo.laci !== 0) {
-        window.state.riwayat.push({
+        const entry = {
           pocket: name,
           jumlah: -(saldo.rekening + saldo.laci),
           waktu: now,
           deskripsi: 'Reset semua data'
-        });
+        };
+        window.state.riwayat.push(entry);
         saldo.rekening = 0;
         saldo.laci = 0;
       }
     });
 
-    saveState();
+    await saveSaldo();
+    for (const entry of window.state.riwayat) {
+      await addRiwayat(entry);
+    }
+
+    localStorage.setItem('warungState', JSON.stringify(window.state));
     renderPockets();
   }
 }
 
-window.hapusSemuaRiwayat = function() {
+window.hapusSemuaRiwayat = async function() {
   if (confirm("Yakin ingin menghapus semua riwayat transaksi? Saldo akan tetap disimpan.")) {
     window.state.riwayat = [];
-    saveState();
+    localStorage.setItem('warungState', JSON.stringify(window.state));
     renderPockets();
+    // (opsional) hapus di Firestore: loop deleteDoc di riwayatCol
   }
 }
 
-// Load awal dari Firebase (atau localStorage fallback)
+// ====== Load Awal ======
 loadFromFirebase();
