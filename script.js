@@ -3,6 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/fireba
 import { 
   getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs 
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
 // Konfigurasi Firebase
 const firebaseConfig = {
@@ -210,6 +211,7 @@ window.renderPockets = function() {
       <button onclick="tambahKeLaci('${name}')" style="background:#2e7d32; color:white;">+ Laci</button>
       <button onclick="transferRekeningKeLaci('${name}')">Transfer</button>
       <button onclick="tarikTunai('${name}')" style="background: orange; color:white;">Tarik Tunai</button>
+      <button onclick="hapusRiwayatPocket('${name}')" style="background:#b71c1c;color:white;">Hapus Riwayat</button>
       <div class="riwayat">${riwayatHTML}</div>
     `;
     container.appendChild(div);
@@ -271,5 +273,60 @@ window.hapusSemuaRiwayat = async function() {
   }
 }
 
+
+
+window.hapusSemuaRiwayat = async function() {
+  if (!confirm("Yakin ingin menghapus SEMUA riwayat transaksi? Saldo akan tetap disimpan.")) return;
+
+  try {
+    // Hapus semua dari Firestore
+    const snapshot = await getDocs(riwayatCol);
+    const batchDeletes = [];
+    snapshot.forEach(d => {
+      batchDeletes.push(deleteDoc(doc(db, "warung/user-pribadi/riwayat", d.id)));
+    });
+    await Promise.all(batchDeletes);
+
+    // Kosongkan riwayat lokal
+    window.state.riwayat = [];
+    localStorage.setItem('warungState', JSON.stringify(window.state));
+
+    renderPockets();
+    alert("Semua riwayat berhasil dihapus.");
+  } catch (err) {
+    console.error("Gagal hapus riwayat:", err);
+    alert("Terjadi kesalahan saat hapus riwayat.");
+  }
+}
+
+window.hapusRiwayatPocket = async function(name) {
+  if (!confirm(`Yakin ingin menghapus semua riwayat untuk pocket ${name}?`)) return;
+
+  try {
+    // Hapus dari Firestore
+    const snapshot = await getDocs(riwayatCol);
+    const batchDeletes = [];
+    snapshot.forEach(d => {
+      if (d.data().pocket === name) {
+        batchDeletes.push(deleteDoc(doc(db, "warung/user-pribadi/riwayat", d.id)));
+      }
+    });
+    await Promise.all(batchDeletes);
+
+    // Hapus dari state lokal
+    window.state.riwayat = window.state.riwayat.filter(r => r.pocket !== name);
+    localStorage.setItem('warungState', JSON.stringify(window.state));
+
+    renderPockets();
+    alert(`Riwayat pocket ${name} berhasil dihapus.`);
+  } catch (err) {
+    console.error("Gagal hapus riwayat pocket:", err);
+    alert("Terjadi kesalahan saat hapus riwayat.");
+  }
+}
+
+
+
 // ====== Load Awal ======
 loadFromFirebase();
+
