@@ -1,7 +1,7 @@
 // ====== Firebase Setup ======
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import { 
-  getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs 
+  getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, query, where
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
 // Konfigurasi Firebase
@@ -32,10 +32,7 @@ export const pockets = [
 ];
 
 // State lokal
-window.state = {
-  saldo: {},
-  riwayat: []
-};
+window.state = { saldo: {}, riwayatCache: {} };
 
 // Inisialisasi saldo default
 pockets.forEach(name => {
@@ -199,19 +196,22 @@ window.renderPockets = function() {
           ${r.deskripsi ? ` - ${r.deskripsi}` : ''}
         </div>`).join('');
 
-    div.innerHTML = `
-      <h3>${name}</h3>
-      <div class="saldo-box">
-        <div class="saldo-item saldo-rekening">Saldo Rekening: Rp ${saldo.rekening.toLocaleString()}</div>
-        <div class="saldo-item saldo-laci">Saldo Laci: Rp ${saldo.laci.toLocaleString()}</div>
-      </div>
-      <input type="number" id="input-${name}" placeholder="Masukkan jumlah...">
-      <button onclick="tambahKeRekening('${name}')">+ Rekening</button>
-      <button onclick="tambahKeLaci('${name}')" style="background:#2e7d32; color:white;">+ Laci</button>
-      <button onclick="transferRekeningKeLaci('${name}')">Transfer</button>
-      <button onclick="tarikTunai('${name}')" style="background: orange; color:white;">Tarik Tunai</button>
-      <div class="riwayat">${riwayatHTML}</div>
-    `;
+        div.innerHTML = `
+          <h3>${name}</h3>
+          <div class="saldo-box">
+            <div class="saldo-item saldo-rekening">Saldo Rekening: Rp ${saldo.rekening.toLocaleString()}</div>
+            <div class="saldo-item saldo-laci">Saldo Laci: Rp ${saldo.laci.toLocaleString()}</div>
+          </div>
+          <input type="number" id="input-${name}" placeholder="Masukkan jumlah...">
+          <button onclick="tambahKeRekening('${name}')" style="background:#1565c0;color:white;">+ Rekening</button>
+          <button onclick="tambahKeLaci('${name}')" style="background:#2e7d32;color:white;">+ Laci</button>
+          <button onclick="transferRekeningKeLaci('${name}')" style="background:#0288d1;color:white;">Transfer</button>
+          <button onclick="tarikTunai('${name}')" style="background:orange;color:white;">Tarik Tunai</button>
+          <button onclick="hapusRiwayatPocket('${name}')" style="background:#c62828;color:white;">Hapus Riwayat</button>
+          <button onclick="toggleRiwayat('${name}')" style="background:#455a64;color:white;">Lihat Riwayat</button>
+          <button onclick="hapusDataPocket('${name}')" style="background:#b71c1c;color:white;">Hapus Data Pocket</button>
+          <div id="riwayat-${name}" class="riwayat" style="display:none;"></div>
+        `;
     container.appendChild(div);
   });
 }
@@ -219,7 +219,11 @@ window.renderPockets = function() {
 // ====== Ekspor Excel ======
 window.downloadExcel = function() {
   const data = window.state.riwayat.map(r => ({
-    Tanggal: new Date(r.waktu).toLocaleString(),
+    Tanggal: new Date(r.waktu).toLocaleString("id-ID", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hour12: false
+    }),
     Pocket: r.pocket,
     Nilai: r.jumlah,
     Deskripsi: r.deskripsi || ''
@@ -229,8 +233,17 @@ window.downloadExcel = function() {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat");
 
-  XLSX.writeFile(workbook, "riwayat_uang_warung.xlsx");
+  // buat nama file dengan tanggal saat export
+  const now = new Date();
+  const tanggal = now.toLocaleDateString("id-ID", {
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).replace(/\//g, "-"); // biar aman jadi format 08-09-2025
+
+  const filename = `riwayat_uang_warung_per_${tanggal}.xlsx`;
+
+  XLSX.writeFile(workbook, filename);
 }
+
 
 // ====== Reset Semua Data ======
 window.resetSemuaData = async function() {
@@ -262,12 +275,116 @@ window.resetSemuaData = async function() {
   }
 }
 
+
 window.hapusSemuaRiwayat = async function() {
-  if (confirm("Yakin ingin menghapus semua riwayat transaksi? Saldo akan tetap disimpan.")) {
+  if (!confirm("Yakin ingin menghapus SEMUA riwayat transaksi? Saldo akan tetap disimpan.")) return;
+
+  try {
+    // Hapus semua dari Firestore
+    const snapshot = await getDocs(riwayatCol);
+    const batchDeletes = [];
+    snapshot.forEach(d => {
+      batchDeletes.push(deleteDoc(doc(db, "warung/user-pribadi/riwayat", d.id)));
+    });
+    await Promise.all(batchDeletes);
+
+    // Kosongkan riwayat lokal
     window.state.riwayat = [];
     localStorage.setItem('warungState', JSON.stringify(window.state));
+
     renderPockets();
-    // (opsional) hapus di Firestore: loop deleteDoc di riwayatCol
+    alert("Semua riwayat berhasil dihapus.");
+  } catch (err) {
+    console.error("Gagal hapus riwayat:", err);
+    alert("Terjadi kesalahan saat hapus riwayat.");
+  }
+}
+
+window.hapusRiwayatPocket = async function(name) {
+  if (!confirm(`Yakin ingin menghapus semua riwayat untuk pocket ${name}?`)) return;
+
+  try {
+    // Hapus dari Firestore
+    const snapshot = await getDocs(riwayatCol);
+    const batchDeletes = [];
+    snapshot.forEach(d => {
+      if (d.data().pocket === name) {
+        batchDeletes.push(deleteDoc(doc(db, "warung/user-pribadi/riwayat", d.id)));
+      }
+    });
+    await Promise.all(batchDeletes);
+
+    // Hapus dari state lokal
+    window.state.riwayat = window.state.riwayat.filter(r => r.pocket !== name);
+    localStorage.setItem('warungState', JSON.stringify(window.state));
+
+    renderPockets();
+    alert(`Riwayat pocket ${name} berhasil dihapus.`);
+  } catch (err) {
+    console.error("Gagal hapus riwayat pocket:", err);
+    alert("Terjadi kesalahan saat hapus riwayat.");
+  }
+}
+
+window.toggleRiwayat = async function(name) {
+  const div = document.getElementById(`riwayat-${name}`);
+  if (!div) return;
+
+  if (div.style.display === "none") {
+    // Kalau cache belum ada → ambil dari Firestore
+    if (!window.state.riwayatCache[name]) {
+      const q = query(riwayatCol, where("pocket", "==", name));
+      const snap = await getDocs(q);
+      const hasil = [];
+      snap.forEach(d => hasil.push(d.data()));
+      // urutkan terbaru dulu
+      hasil.sort((a, b) => new Date(b.waktu) - new Date(a.waktu));
+      window.state.riwayatCache[name] = hasil;
+    }
+
+    // Render riwayat
+    const riwayat = window.state.riwayatCache[name];
+    div.innerHTML = riwayat.length === 0
+      ? '<div class="riwayat-entry">Tidak ada transaksi.</div>'
+      : riwayat.map(r => `
+          <div class="riwayat-entry">
+            ${new Date(r.waktu).toLocaleString("id-ID", {
+              year: "numeric", month: "2-digit", day: "2-digit",
+              hour: "2-digit", minute: "2-digit", second: "2-digit",
+              hour12: false
+            })} : Rp ${r.jumlah.toLocaleString()} - ${r.deskripsi || ''}
+          </div>`).join('');
+    div.style.display = "block";
+  } else {
+    div.style.display = "none";
+  }
+}
+
+window.hapusDataPocket = async function(name) {
+  if (!confirm(`Yakin ingin menghapus semua data (saldo + riwayat) untuk pocket ${name}?`)) return;
+
+  try {
+    // Reset saldo pocket ke 0
+    window.state.saldo[name] = { rekening: 0, laci: 0 };
+    await saveSaldo();
+
+    // Hapus riwayat di Firestore untuk pocket ini
+    const snapshot = await getDocs(riwayatCol);
+    const deletes = [];
+    snapshot.forEach(d => {
+      if (d.data().pocket === name) deletes.push(deleteDoc(d.ref));
+    });
+    await Promise.all(deletes);
+
+    // Hapus riwayat di cache lokal
+    window.state.riwayatCache[name] = [];
+    localStorage.setItem('warungState', JSON.stringify(window.state));
+
+    renderPockets();
+    alert(`Data pocket ${name} berhasil dihapus.`);
+  } catch (err) {
+    console.error("Gagal hapus data pocket:", err);
+    alert("Terjadi kesalahan saat hapus data pocket.");
   }
 }
 
