@@ -15,8 +15,10 @@
   <div class="container" id="pocketContainer"></div>
 
 <div class="actions">
-  <button onclick="downloadExcel()">Download Excel (.xlsx)</button>
+  <button onclick="downloadExcel()" style="background:#028d02;color:white;">Download Excel (.xlsx)</button>
   <button class="reset-btn" onclick="resetSemuaData()">Reset Semua Data</button>
+  <button onclick="hapusRiwayatPocket('${name}')" style="background:#b71c1c;color:white;">Hapus Riwayat</button>
+
 </div>
 
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
